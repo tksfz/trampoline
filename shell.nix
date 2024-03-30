@@ -13,6 +13,9 @@ in
       # If the dependencies need system libs, you usually need pkg-config + the lib
       pkgs.pkg-config
       pkgs.openssl
+
+      pkgs.protobuf
+      pkgs.minikube
     ];
 
     env = {
