@@ -15,7 +15,12 @@ in
       pkgs.openssl
 
       pkgs.protobuf
+
       pkgs.minikube
+      pkgs.kubernetes-helm
+      pkgs.k9s
+
+      pkgs.vscode
     ];
 
     env = {
