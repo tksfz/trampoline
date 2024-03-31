@@ -4,6 +4,9 @@ use pulsar::{
     Consumer, DeserializeMessage, Pulsar, TokioExecutor,
 };
 use serde::{Deserialize, Serialize};
+use anyhow::Result;
+
+mod config;
 
 #[derive(Serialize, Deserialize)]
 struct TestData {
@@ -19,11 +22,13 @@ impl DeserializeMessage for TestData {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), pulsar::Error> {
+async fn main() -> Result<()> {
     env_logger::init();
 
-    let addr = "pulsar://192.168.49.2:31378";
-    let pulsar: Pulsar<_> = Pulsar::builder(addr, TokioExecutor).build().await?;
+    let config = config::Config::read()?;
+    println!("Using Pulsar at {}", config.mq.url);
+
+    let pulsar: Pulsar<_> = Pulsar::builder(config.mq.url, TokioExecutor).build().await?;
 
     let mut consumer: Consumer<TestData, _> = pulsar
         .consumer()
