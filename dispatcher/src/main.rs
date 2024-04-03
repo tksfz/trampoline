@@ -7,6 +7,9 @@ use serde::{Deserialize, Serialize};
 use anyhow::Result;
 
 mod config;
+mod data;
+
+use data::DynamicMessage;
 
 #[derive(Serialize, Deserialize)]
 struct TestData {
@@ -30,7 +33,7 @@ async fn main() -> Result<()> {
 
     let pulsar: Pulsar<_> = Pulsar::builder(config.mq.url, TokioExecutor).build().await?;
 
-    let mut consumer: Consumer<TestData, _> = pulsar
+    let mut consumer: Consumer<DynamicMessage, _> = pulsar
         .consumer()
         .with_topic("test")
         .with_consumer_name("test_consumer")
@@ -50,10 +53,8 @@ async fn main() -> Result<()> {
             }
         };
 
-        if data.data.as_str() != "data" {
-            log::error!("Unexpected payload: {}", &data.data);
-            break;
-        }
+        log::info!("got message {} {}", &data.type_name, &data.value.to_string());
+
         counter += 1;
         log::info!("got {} messages", counter);
     }
