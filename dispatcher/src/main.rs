@@ -3,13 +3,17 @@ use pulsar::{
     message::{proto::command_subscribe::SubType, Payload},
     Consumer, DeserializeMessage, Pulsar, TokioExecutor,
 };
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
 
 mod config;
 mod data;
+mod core;
 
 use data::DynamicMessage;
+use core::WorkerMatcher;
+use core::{Forwarder, ForwardResult};
 
 #[derive(Serialize, Deserialize)]
 struct TestData {
@@ -29,7 +33,6 @@ async fn main() -> Result<()> {
     env_logger::init();
 
     let config = config::Config::read()?;
-    println!("Using Pulsar at {}", config.mq.url);
 
     let pulsar: Pulsar<_> = Pulsar::builder(config.mq.url, TokioExecutor).build().await?;
 
@@ -42,6 +45,10 @@ async fn main() -> Result<()> {
         .build()
         .await?;
 
+    let client = Client::new();
+    let worker_matcher = WorkerMatcher::new(&config.workers)?;
+    let processor = Forwarder::new(client, worker_matcher);
+
     let mut counter = 0usize;
     while let Some(msg) = consumer.try_next().await? {
         consumer.ack(&msg).await?;
@@ -53,7 +60,15 @@ async fn main() -> Result<()> {
             }
         };
 
-        log::info!("got message {} {}", &data.type_name, &data.value.to_string());
+        let result = processor.process(&data).await?;
+        match result {
+            Some(ForwardResult::Continue { status, text }) => {
+                log::info!("got message {} {}, result: {} {}", &data.type_name, &data.value.to_string(), status, text);
+            },
+            None => {
+                log::info!("could not find worker for {} {}", &data.type_name, &data.value.to_string())
+            }
+        };
 
         counter += 1;
         log::info!("got {} messages", counter);
