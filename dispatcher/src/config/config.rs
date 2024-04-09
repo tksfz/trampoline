@@ -22,7 +22,8 @@ pub struct Config {
 
 #[derive(Deserialize, Clone)]
 pub struct Mq {
-    pub url: String
+    pub url: String,
+    pub topics: Vec<String>
 }
 
 #[derive(Deserialize, Clone)]

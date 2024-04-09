@@ -62,6 +62,7 @@ the following contents:
 ```toml
 [mq]
 url = "pulsar://<the service url from `minikube service`>"
+topics = [ "email" ]
 
 [[workers]]
 task_selector = { type = "email-pipeline" }
@@ -74,7 +75,7 @@ For `mq.url` use the Pulsar service URL printed from the `minikube service` comm
 ## Build and Run the Dispatcher
 
 ```
-trampoline/dispatcher$ cargo run
+trampoline/dispatcher$ RUST_LOG=info cargo run
 ```
 
 ## Send Task Messages to the Queue
@@ -83,7 +84,7 @@ The Pulsar deployment includes a toolkit pod that contains the basic Pulsar tool
 
 ```
 $ kubectl exec -it -n pulsar pulsar-mini-toolset-0 -- /bin/bash
-pulsar@pulsar-mini-toolset-0:/pulsar$ bin/pulsar-client produce test  -m '{"type": "email-pipeline", "value": {}}' -s '\n'
+pulsar@pulsar-mini-toolset-0:/pulsar$ bin/pulsar-client produce email -m '{"type": "email-pipeline", "value": {}}' -s '\n'
 ```
 
 This triggers a run of the dummy batch email pipeline. You can observe the run by

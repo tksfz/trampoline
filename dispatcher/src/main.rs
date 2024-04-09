@@ -5,7 +5,7 @@ use pulsar::{
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use anyhow::Result;
+use anyhow::{bail, Result};
 
 mod config;
 mod data;
@@ -33,15 +33,19 @@ async fn main() -> Result<()> {
     env_logger::init();
 
     let config = config::Config::read()?;
+    if config.mq.topics.is_empty() {
+        // This could be relaxed in the future if we support dynamic reconfiguration
+        bail!("at least one topic must be specified in config `mq.topics`");
+    }
 
     let pulsar: Pulsar<_> = Pulsar::builder(config.mq.url, TokioExecutor).build().await?;
 
     let mut consumer: Consumer<DynamicMessage, _> = pulsar
         .consumer()
-        .with_topic("test")
-        .with_consumer_name("test_consumer")
+        .with_topics(config.mq.topics)
+        .with_consumer_name("trampoline-dispatcher")
         .with_subscription_type(SubType::Exclusive)
-        .with_subscription("test_subscription")
+        .with_subscription("trampoline-dispatch")
         .build()
         .await?;
 
