@@ -121,7 +121,19 @@ name = "email-pipeline-worker"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "erased-serde",
+ "serde",
+ "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "erased-serde"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b73807008a3c7f171cc40312f37d95ef0396e048b5848d775f54b1a4dd4a0d3"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
