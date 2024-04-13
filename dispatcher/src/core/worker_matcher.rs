@@ -2,11 +2,11 @@ use std::str::FromStr;
 
 use reqwest::Url;
 
-use crate::data::DynamicMessage;
+use crate::data::DynamicTaskMessage;
 use crate::config::TaskWorker;
 
 pub struct WorkerMatcher {
-    matchers: Vec<Box<dyn Fn(&DynamicMessage) -> Option<Url>>>,
+    matchers: Vec<Box<dyn Fn(&DynamicTaskMessage) -> Option<Url>>>,
 }
 
 impl WorkerMatcher {
@@ -24,7 +24,7 @@ impl WorkerMatcher {
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .map(|(c, url)| { 
-                Box::new(move |msg: &DynamicMessage| -> Option<Url> {
+                Box::new(move |msg: &DynamicTaskMessage| -> Option<Url> {
                     if msg.type_name == c.task_selector.type_name {
                         Some(url.to_owned())
                     } else {
@@ -35,7 +35,7 @@ impl WorkerMatcher {
         Ok(WorkerMatcher { matchers: Vec::from_iter(matchers) })
     }
 
-    pub fn match_worker(&self, msg: &DynamicMessage) -> Option<Url> {
+    pub fn match_worker(&self, msg: &DynamicTaskMessage) -> Option<Url> {
         self.matchers.iter().find_map(|f| f(msg))
     }
 }

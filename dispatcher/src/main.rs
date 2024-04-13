@@ -11,7 +11,7 @@ mod config;
 mod data;
 mod core;
 
-use data::DynamicMessage;
+use data::DynamicTaskMessage;
 use core::WorkerMatcher;
 use core::{Forwarder, ForwardResult};
 
@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
 
     let pulsar: Pulsar<_> = Pulsar::builder(config.mq.url, TokioExecutor).build().await?;
 
-    let mut consumer: Consumer<DynamicMessage, _> = pulsar
+    let mut consumer: Consumer<DynamicTaskMessage, _> = pulsar
         .consumer()
         .with_topics(config.mq.topics)
         .with_consumer_name("trampoline-dispatcher")
@@ -67,10 +67,11 @@ async fn main() -> Result<()> {
         let result = processor.process(&data).await?;
         match result {
             Some(ForwardResult::Continue { status, text }) => {
-                log::info!("got message {} {}, result: {} {}", &data.type_name, &data.value.to_string(), status, text);
+                log::info!("got message {} {}, result: {} {}", &data.type_name, &data.task.to_string(), status, text);
+
             },
             None => {
-                log::info!("could not find worker for {} {}", &data.type_name, &data.value.to_string())
+                log::info!("could not find worker for {} {}", &data.type_name, &data.task.to_string())
             }
         };
 

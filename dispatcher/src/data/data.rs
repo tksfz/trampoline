@@ -3,14 +3,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Serialize, Deserialize)]
-pub struct DynamicMessage {
+pub struct DynamicTaskMessage {
     #[serde(rename = "type")]
     pub type_name: String,
-    pub value: Value,
+    pub task: Value,
 }
 
-impl DeserializeMessage for DynamicMessage {
-    type Output = Result<DynamicMessage, serde_json::Error>;
+impl DeserializeMessage for DynamicTaskMessage {
+    type Output = Result<DynamicTaskMessage, serde_json::Error>;
 
     fn deserialize_message(payload: &Payload) -> Self::Output {
         serde_json::from_slice(&payload.data)

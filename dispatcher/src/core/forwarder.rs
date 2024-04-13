@@ -1,6 +1,6 @@
 use anyhow::Result;
 use reqwest::{Client, StatusCode};
-use crate::data::DynamicMessage;
+use crate::data::DynamicTaskMessage;
 use crate::core::worker_matcher::WorkerMatcher;
 use serde_json;
 
@@ -18,7 +18,7 @@ impl Forwarder {
         Forwarder { client, worker_matcher }
     }
 
-    pub async fn process(&self, msg: &DynamicMessage) -> Result<Option<ForwardResult>> {
+    pub async fn process(&self, msg: &DynamicTaskMessage) -> Result<Option<ForwardResult>> {
         // Map TypedMessage to some task schema that we recognize
     
         // validate the message against schema. this should maybe happen in the caller.
@@ -29,7 +29,7 @@ impl Forwarder {
         // Make the HTTP call    
         let result = match endpoint {
             Some(url) => {
-                let body = serde_json::to_string(&msg.value)?;
+                let body = serde_json::to_string(&msg.task)?;
                 let req = self.client
                     .post(url.clone())
                     .header("Content-Type", "application/json")
@@ -38,7 +38,7 @@ impl Forwarder {
 
                 let result = ForwardResult::Continue { status: res.status(), text: res.text().await? };
                 let ForwardResult::Continue { status, ref text } = result;
-                log::info!("sent message {} {}, worker {}, received message {} {}", &msg.type_name, &msg.value, url, status, &text);
+                log::info!("sent message {} {}, worker {}, received message {} {}", &msg.type_name, &msg.task, url, status, &text);
                 Some(result)
             },
             None => {

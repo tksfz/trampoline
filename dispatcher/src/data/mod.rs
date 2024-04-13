@@ -1,3 +1,3 @@
 mod data;
 
-pub use data::DynamicMessage;
+pub use data::DynamicTaskMessage;
