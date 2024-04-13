@@ -121,7 +121,7 @@ async fn generate_email(Json(payload): Json<GenerateEmailTask>) -> Json<Trampoli
 
 async fn send_email(Json(payload): Json<SendEmailTask>) -> Json<TrampolineResponse> {
     // Pretend to send the email, and move on to the next step
-    println!("Pretending to send email to {} with subject {} and body {}", &payload.email_address, &payload.email_subject, &payload.email_body);
+    log::info!("Pretending to send email to {} with subject {} and body {}", &payload.email_address, &payload.email_subject, &payload.email_body);
     Json::from(TrampolineResponse {
         tasks: vec![Box::new(TrampolineTask {
             task_type: EmailPipelineTaskTypes::RECORD_SEND_RESULT.to_owned(),
@@ -134,7 +134,7 @@ async fn send_email(Json(payload): Json<SendEmailTask>) -> Json<TrampolineRespon
 }
 
 async fn record_send_result(Json(payload): Json<RecordSendResultTask>) -> Json<TrampolineResponse> {
-    println!("Recording send result for email to {}, successful {}", &payload.email_address, &payload.successful);
+    log::info!("Recording send result for email to {}, successful {}", &payload.email_address, &payload.successful);
     Json::from(TrampolineResponse {
         tasks: Vec::new()
     })
@@ -142,6 +142,8 @@ async fn record_send_result(Json(payload): Json<RecordSendResultTask>) -> Json<T
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+    
     // build our application with a single route
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
