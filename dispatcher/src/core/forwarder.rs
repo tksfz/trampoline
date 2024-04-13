@@ -32,6 +32,7 @@ impl Forwarder {
                 let body = serde_json::to_string(&msg.value)?;
                 let req = self.client
                     .post(url.clone())
+                    .header("Content-Type", "application/json")
                     .body(body);
                 let res = req.send().await?;
 
