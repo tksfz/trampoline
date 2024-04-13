@@ -1,16 +1,26 @@
 use anyhow::Result;
 use reqwest::{Client, StatusCode};
+use serde::Deserialize;
 use crate::data::DynamicTaskMessage;
 use crate::core::worker_matcher::WorkerMatcher;
-use serde_json;
 
 pub enum ForwardResult {
-    Continue { status: StatusCode, text: String }
+    /// Successful processing that should continue with the tasks in the parsed WorkerResponse
+    Continue { status: StatusCode, response: WorkerResponse },
+
+    /// Successful processing with un unparseable response
+    ContinueUnparseable { status: StatusCode, text: String },
 }
 
 pub struct Forwarder {
     client: Client,
     worker_matcher: WorkerMatcher,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct WorkerResponse {
+    /// responses can contain multiple tasks, of varying types
+    tasks: Vec<DynamicTaskMessage>,
 }
 
 impl Forwarder {
@@ -35,9 +45,16 @@ impl Forwarder {
                     .header("Content-Type", "application/json")
                     .body(body);
                 let res = req.send().await?;
-
-                let result = ForwardResult::Continue { status: res.status(), text: res.text().await? };
-                let ForwardResult::Continue { status, ref text } = result;
+                let status = res.status();
+                let text = res.text().await?;
+                let parsed_response: Result<WorkerResponse, serde_json::Error> = serde_json::from_str(&text);
+                let result = match parsed_response {
+                    Ok(worker_response) => ForwardResult::Continue { status, response: worker_response },
+                    Err(_) =>
+                        // TODO: worker declaration should include a flag that indicates strict response handling, meaning an unparseable response should go to a DLQ
+                        ForwardResult::ContinueUnparseable { status, text: text.clone() }
+                };
+                
                 log::info!("sent message {} {}, worker {}, received message {} {}", &msg.type_name, &msg.task, url, status, &text);
                 Some(result)
             },

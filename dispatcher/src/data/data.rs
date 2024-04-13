@@ -2,10 +2,11 @@ use pulsar::{DeserializeMessage, Payload};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DynamicTaskMessage {
     #[serde(rename = "type")]
     pub type_name: String,
+    // FUTURE: scheduling options go here
     pub task: Value,
 }
 
