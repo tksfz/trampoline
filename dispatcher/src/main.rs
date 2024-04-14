@@ -49,6 +49,11 @@ async fn main() -> Result<()> {
         .build()
         .await?;
 
+    let mut producers = pulsar
+        .producer()
+        .with_name("trampoline-dispatcher-republish")
+        .build_multi_topic();
+
     let client = Client::new();
     let worker_matcher = WorkerMatcher::new(&config.workers)?;
     let processor = Forwarder::new(client, worker_matcher);
@@ -66,12 +71,19 @@ async fn main() -> Result<()> {
 
         let result = processor.process(&data).await?;
         match result {
-            Some(ForwardResult::Continue { status, text }) => {
-                log::info!("got message {} {}, result: {} {}", &data.type_name, &data.task.to_string(), status, text);
+            Some(ForwardResult::Continue { status, response }) => {
+                log::info!("got message {} {}, result: {} {:?}", &data.type_name, &data.task, status, &response);
+                for response_task in response.tasks {
+                    let topic = response_task.type_name.clone();
+                    producers.send(topic, response_task).await?;
+                }
+            },
+            Some(ForwardResult::ContinueUnparseable { status, text }) => {
+                log::info!("got message {} {}, result: {} {}", &data.type_name, &data.task, status, text);
 
             },
             None => {
-                log::info!("could not find worker for {} {}", &data.type_name, &data.task.to_string())
+                log::info!("could not find worker for {} {}", &data.type_name, &data.task)
             }
         };
 

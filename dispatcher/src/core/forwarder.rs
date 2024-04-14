@@ -20,7 +20,7 @@ pub struct Forwarder {
 #[derive(Deserialize, Debug)]
 pub struct WorkerResponse {
     /// responses can contain multiple tasks, of varying types
-    tasks: Vec<DynamicTaskMessage>,
+    pub tasks: Vec<DynamicTaskMessage>,
 }
 
 impl Forwarder {

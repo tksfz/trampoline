@@ -1,4 +1,4 @@
-use pulsar::{DeserializeMessage, Payload};
+use pulsar::{producer, DeserializeMessage, Error as PulsarError, Payload, SerializeMessage};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -17,3 +17,15 @@ impl DeserializeMessage for DynamicTaskMessage {
         serde_json::from_slice(&payload.data)
     }
 }
+
+impl SerializeMessage for DynamicTaskMessage {
+    fn serialize_message(input: Self) -> Result<producer::Message, PulsarError> {
+        let payload =
+            serde_json::to_vec(&input).map_err(|e| PulsarError::Custom(e.to_string()))?;
+        Ok(producer::Message {
+            payload,
+            ..Default::default()
+        })
+    }
+}
+
