@@ -18,10 +18,16 @@ impl DeserializeMessage for DynamicTaskMessage {
     }
 }
 
-impl SerializeMessage for DynamicTaskMessage {
+/* SerializeMessage takes input as move by default to avoid copies:
+     https://github.com/streamnative/pulsar-rs/pull/109
+
+   Here, since serde_json::to_vec takes a reference anyway, it doesn't matter
+   and we impl on the more natural reference type
+ */
+impl SerializeMessage for &DynamicTaskMessage {
     fn serialize_message(input: Self) -> Result<producer::Message, PulsarError> {
         let payload =
-            serde_json::to_vec(&input).map_err(|e| PulsarError::Custom(e.to_string()))?;
+            serde_json::to_vec(input).map_err(|e| PulsarError::Custom(e.to_string()))?;
         Ok(producer::Message {
             payload,
             ..Default::default()

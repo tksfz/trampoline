@@ -72,11 +72,13 @@ async fn main() -> Result<()> {
         let result = processor.process(&data).await?;
         match result {
             Some(ForwardResult::Continue { status, response }) => {
-                log::info!("got message {} {}, result: {} {:?}", &data.type_name, &data.task, status, &response);
-                for response_task in response.tasks {
-                    let topic = response_task.type_name.clone();
+                for response_task in &response.tasks {
+                    let topic = &response_task.type_name;
                     producers.send(topic, response_task).await?;
                 }
+                let message_id = format!("{}:{}:{}:{}", &msg.topic, msg.message_id.id.ledger_id, msg.message_id.id.entry_id, msg.message_id.id.partition.unwrap_or(-1));
+                let plural = if response.tasks.len() == 1 { "task" } else { "tasks" };
+                log::info!("messageId:<{}> task:<{}> status:<{}> result:<Continue:{} new {}>", message_id, &data.type_name, status, response.tasks.len(), plural);
             },
             Some(ForwardResult::ContinueUnparseable { status, text }) => {
                 log::info!("got message {} {}, result: {} {}", &data.type_name, &data.task, status, text);
@@ -88,8 +90,7 @@ async fn main() -> Result<()> {
         };
 
         counter += 1;
-        log::info!("got {} messages", counter);
     }
-
+    log::info!("got {} messages", counter);
     Ok(())
 }
