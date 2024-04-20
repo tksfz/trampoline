@@ -106,14 +106,19 @@ async fn fetch_users(Json(payload): Json<FetchUsersTask>) -> Json<TrampolineResp
     })
 }
 
-async fn generate_email(Json(payload): Json<GenerateEmailTask>) -> Json<TrampolineResponse> {
+async fn generate_email(Json(task): Json<GenerateEmailTask>) -> Json<TrampolineResponse> {
+    // Generate an email
+    let email_subject = task.email_subject.unwrap_or("Hello World!".to_owned());
+    let email_body = format!("Hello {}", task.email_address);
+    
+    // Next step is to send the email
     Json::from(TrampolineResponse {
         tasks: vec![Box::new(TrampolineTask {
             task_type: EmailPipelineTaskTypes::SEND_EMAIL.to_owned(),
             task: SendEmailTask {
-                email_body: format!("Hello {}", payload.email_address),
-                email_address: payload.email_address,
-                email_subject: payload.email_subject.unwrap_or("Hello World!".to_owned()),
+                email_body: email_body,
+                email_address: task.email_address,
+                email_subject: email_subject,
             }
         })]
     })
