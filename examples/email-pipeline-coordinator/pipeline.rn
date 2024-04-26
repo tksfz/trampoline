@@ -1,0 +1,113 @@
+struct Result {
+  status,
+  tasks,
+}
+
+struct Task {
+  type_name,
+  data
+}
+
+async fn handle(client, typ, data) {
+  match typ {
+    "email-pipeline-start" => {
+      Result {
+        status: 200,
+        tasks: [ Task {
+          type_name: "email-pipeline-fetch-users",
+          data: #{
+            "email_subject": data.get("email_subject"),
+          }
+        }]
+      }
+    }
+    ,
+    "email-pipeline-fetch-users" => {
+      let res = json::from_string(http::get("http://localhost:3000/users").await?.text().await?)?;
+      dbg("fetch", res);
+      Result {
+        status: 200,
+        tasks: res.iter().map(|u| Task {
+          type_name: "email-pipeline-generate-email",
+          data: #{
+            "email_address": u,
+            "email_subject": data.get("email_subject"),
+          }
+        }).collect::<Vec>()
+      }
+    },
+    "email-pipeline-generate-email" => {
+      let res = http::get(`http://localhost:3000/generate-email?email_address=${data["email_address"]}`).await?;
+      dbg(`status ${res.status()}`);
+      let res = res.text().await?;
+      dbg("gen", res);
+      let email_data = json::from_string(res)?;
+      dbg("email_data", email_data);
+      Result {
+        status: 200,
+        tasks: [ Task {
+          type_name: "email-pipeline-send-email",
+          data: #{
+            "email_address": email_data["email_address"],
+            "email_subject": email_data["email_subject"],
+            "email_body": email_data["email_body"],
+          }
+        }]
+      }
+    },
+    "email-pipeline-send-email" => {
+      dbg("hi");
+      let body = #{
+        "email_address": data["email_address"],
+        "email_subject": data["email_subject"],
+        "email_body": data["email_body"],
+      };
+      let res = client.post("http://localhost:3000/send-email")
+      .header("Content-Type", "application/json")
+      .body_bytes(json::to_bytes(body)?)
+      .send().await?
+      .text().await?;
+      dbg("send res", res);
+      let success = json::from_string(res)?;
+      Result {
+        status: 200,
+        tasks: [ Task {
+          type_name: "email-pipeline-record-send-result",
+          data: #{
+            "email_address": data.email_address,
+            "successful": success,
+          }
+        }]
+      }
+    },
+    "email-pipeline-record-send-result" => {
+      Result {
+        status: 200,
+        tasks: [],
+      }
+    },
+    // TODO: smarter way to handle unknown
+  }
+}
+
+pub async fn main() {
+  let client = http::Client::new();
+  let tasks = Vec::new();
+  tasks.push(Task { type_name: "email-pipeline-fetch-users", data: #{} });
+  loop {
+    let task = tasks.pop();
+    match task {
+      Some(task) => {
+        dbg("task: ", task);
+        let result = handle(client, task.type_name, task.data).await;
+        dbg("result: ", result);
+        for result_task in result.tasks {
+          tasks.push(result_task);
+        }
+      },
+      None => {
+        break;
+      }
+    }
+  }
+}
