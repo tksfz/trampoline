@@ -1,15 +1,15 @@
 struct Task {
-  type_name,
-  data
+  type,
+  task
 }
 
-async fn handle(client, typ, data) {
-  match typ {
+async fn handle(client, type, task) {
+  match type {
     "email-pipeline-start" => {
       Task {
-        type_name: "email-pipeline-fetch-users",
-        data: #{
-          "email_subject": data.get("email_subject"),
+        type: "email-pipeline-fetch-users",
+        task: #{
+          "email_subject": task.get("email_subject"),
         }
       }
     }
@@ -17,20 +17,20 @@ async fn handle(client, typ, data) {
     "email-pipeline-fetch-users" => {
       let res = json::from_string(http::get("http://localhost:3000/users").await?.text().await?)?;
       res.iter().map(|u| Task {
-        type_name: "email-pipeline-generate-email",
-        data: #{
+        type: "email-pipeline-generate-email",
+        task: #{
           "email_address": u,
-          "email_subject": data.get("email_subject"),
+          "email_subject": task.get("email_subject"),
         }
       }).collect::<Vec>()
     },
     "email-pipeline-generate-email" => {
-      let res = http::get(`http://localhost:3000/generate-email?email_address=${data["email_address"]}`).await?;
+      let res = http::get(`http://localhost:3000/generate-email?email_address=${task["email_address"]}`).await?;
       let res = res.text().await?;
       let email_data = json::from_string(res)?;
       Task {
-        type_name: "email-pipeline-send-email",
-        data: #{
+        type: "email-pipeline-send-email",
+        task: #{
           "email_address": email_data["email_address"],
           "email_subject": email_data["email_subject"],
           "email_body": email_data["email_body"],
@@ -39,9 +39,9 @@ async fn handle(client, typ, data) {
     },
     "email-pipeline-send-email" => {
       let body = #{
-        "email_address": data["email_address"],
-        "email_subject": data["email_subject"],
-        "email_body": data["email_body"],
+        "email_address": task["email_address"],
+        "email_subject": task["email_subject"],
+        "email_body": task["email_body"],
       };
       let res = client.post("http://localhost:3000/send-email")
         .header("Content-Type", "application/json")
@@ -50,9 +50,9 @@ async fn handle(client, typ, data) {
         .text().await?;
       let success = json::from_string(res)?;
       Task {
-        type_name: "email-pipeline-record-send-result",
-        data: #{
-          "email_address": data.email_address,
+        type: "email-pipeline-record-send-result",
+        task: #{
+          "email_address": task.email_address,
           "successful": success,
         }
       }
@@ -67,13 +67,13 @@ async fn handle(client, typ, data) {
 pub async fn main() {
   let client = http::Client::new();
   let tasks = Vec::new();
-  tasks.push(Task { type_name: "email-pipeline-fetch-users", data: #{} });
+  tasks.push(Task { type: "email-pipeline-fetch-users", task: #{} });
   loop {
     let task = tasks.pop();
     match task {
       Some(task) => {
         dbg(task);
-        let result = handle(client, task.type_name, task.data).await;
+        let result = handle(client, task.type, task.task).await;
         dbg(result);
         let result_tasks = match result {
           task if result is Task => [ task ],
