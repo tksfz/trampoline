@@ -23,7 +23,7 @@ struct SendResult {
     successful: bool,
 }
 
-async fn fetch_users() -> Json<Vec<String>> {
+async fn query_users() -> Json<Vec<String>> {
     // Run some query to find users, here we pretend and simply return a hard-coded list
     let users = vec!["foo@nowhere.nowhere", "bar@nowhere.nowhere", "nobody@nowhere.nowhere"];
     return Json::from(users.into_iter().map(|u| u.to_owned()).collect::<Vec<String>>());
@@ -57,7 +57,7 @@ async fn main() {
     
     // build our application with a single route
     let app = Router::new()
-        .route("/fetch-users", get(fetch_users))
+        .route("/users", get(query_users))
         .route("/generate-email", get(generate_email))
         .route("/send-email", post(send_email))
         .route("/record-send-result", post(record_send_result));
