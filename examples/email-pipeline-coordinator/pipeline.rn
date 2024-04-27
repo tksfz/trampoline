@@ -12,8 +12,7 @@ async fn handle(client, type, task) {
           "email_subject": task.get("email_subject"),
         }
       }
-    }
-    ,
+    },
     "email-pipeline-fetch-users" => {
       let res = json::from_string(http::get("http://localhost:3000/users").await?.text().await?)?;
       res.iter().map(|u| Task {
