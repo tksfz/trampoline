@@ -24,8 +24,8 @@ async fn handle(client, type, task) {
       }).collect::<Vec>()
     },
     "email-pipeline-generate-email" => {
-      let res = http::get(`http://localhost:3000/generate-email?email_address=${task["email_address"]}`).await?;
-      let res = res.text().await?;
+      let res = http::get(`http://localhost:3000/generate-email?email_address=${task["email_address"]}`)
+        .await?.text().await?;
       let email_data = json::from_string(res)?;
       Task {
         type: "email-pipeline-send-email",
