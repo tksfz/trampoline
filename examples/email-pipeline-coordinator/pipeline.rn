@@ -1,0 +1,96 @@
+struct Task {
+  type,
+  task
+}
+
+async fn handle(client, type, task) {
+  match type {
+    "email-pipeline-start" => {
+      Ok(Task {
+        type: "email-pipeline-fetch-users",
+        task: #{
+          "email_subject": task.get("email_subject"),
+        }
+      })
+    },
+    "email-pipeline-fetch-users" => {
+      let res = json::from_string(http::get("http://localhost:3000/users").await?.text().await?)?;
+      Ok(res.iter().map(|u| Task {
+        type: "email-pipeline-generate-email",
+        task: #{
+          "email_address": u,
+          "email_subject": task.get("email_subject"),
+        }
+      }).collect::<Vec>())
+    },
+    "email-pipeline-generate-email" => {
+      let res = http::get(`http://localhost:3000/generate-email?email_address=${task["email_address"]}`)
+        .await?.text().await?;
+      let email_data = json::from_string(res)?;
+      Ok(Task {
+        type: "email-pipeline-send-email",
+        task: #{
+          "email_address": email_data["email_address"],
+          "email_subject": email_data["email_subject"],
+          "email_body": email_data["email_body"],
+        }
+      })
+    },
+    "email-pipeline-send-email" => {
+      let body = #{
+        "email_address": task["email_address"],
+        "email_subject": task["email_subject"],
+        "email_body": task["email_body"],
+      };
+      let res = client.post("http://localhost:3000/send-email")
+        .header("Content-Type", "application/json")
+        .body_bytes(json::to_bytes(body)?)
+        .send().await?
+        .text().await?;
+      let success = json::from_string(res)?;
+      Ok(Task {
+        type: "email-pipeline-record-send-result",
+        task: #{
+          "email_address": task.email_address,
+          "successful": success,
+        }
+      })
+    },
+    "email-pipeline-record-send-result" => {
+      Ok([])
+    },
+    _ => Err("invalid task type")
+  }
+}
+
+// Essentially test code
+pub async fn main() {
+  let client = http::Client::new();
+  let tasks = Vec::new();
+  tasks.push(Task { type: "email-pipeline-fetch-users", task: #{} });
+  loop {
+    let task = tasks.pop();
+    match task {
+      Some(task) => {
+        dbg(task);
+        let result = handle(client, task.type, task.task).await;
+        match result {
+          // This seems necessary to propagate the error out of the loop
+          Err(x) => panic!("{}", x)
+        }
+        let result = result?;
+        dbg(result);
+        let result_tasks = match result {
+          task if result is Task => [ task ],
+          vec if result is Vec => vec,
+        };
+        for result_task in result_tasks {
+          tasks.push(result_task);
+        }
+      },
+      None => {
+        break;
+      }
+    }
+  }
+}
