@@ -17,7 +17,7 @@ pub struct Config {
     // task worker selectors
     // task publish rules
 
-    pub workers: Vec<TaskWorker>,
+    pub handlers: Vec<TaskHandler>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -27,9 +27,10 @@ pub struct Mq {
 }
 
 #[derive(Deserialize, Clone)]
-pub struct TaskWorker {
+pub struct TaskHandler {
     pub task_selector: Select,
-    pub endpoint: String,
+    pub endpoint: Option<String>,
+    pub pipeline: Option<String>,
 }
 
 #[derive(Deserialize, Clone)]

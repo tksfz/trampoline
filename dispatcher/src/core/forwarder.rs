@@ -4,7 +4,7 @@ use serde::Deserialize;
 use crate::data::DynamicTaskMessage;
 use crate::core::worker_matcher::WorkerMatcher;
 
-pub enum ForwardResult {
+pub enum HandleResult {
     /// Successful processing that should continue with the tasks in the parsed WorkerResponse
     Continue { status: StatusCode, response: WorkerResponse },
 
@@ -28,7 +28,7 @@ impl Forwarder {
         Forwarder { client, worker_matcher }
     }
 
-    pub async fn process(&self, msg: &DynamicTaskMessage) -> Result<Option<ForwardResult>> {
+    pub async fn process(&self, msg: &DynamicTaskMessage) -> Result<Option<HandleResult>> {
         // Map TypedMessage to some task schema that we recognize
     
         // validate the message against schema. this should maybe happen in the caller.
@@ -49,10 +49,10 @@ impl Forwarder {
                 let text = res.text().await?;
                 let parsed_response: Result<WorkerResponse, serde_json::Error> = serde_json::from_str(&text);
                 let result = match parsed_response {
-                    Ok(worker_response) => ForwardResult::Continue { status, response: worker_response },
+                    Ok(worker_response) => HandleResult::Continue { status, response: worker_response },
                     Err(_) =>
                         // TODO: worker declaration should include a flag that indicates strict response handling, meaning an unparseable response should go to a DLQ
-                        ForwardResult::ContinueUnparseable { status, text: text.clone() }
+                        HandleResult::ContinueUnparseable { status, text: text.clone() }
                 };
                 
                 log::info!("sent message {} {}, worker {}, received message {} {}", &msg.type_name, &msg.task, url, status, &text);

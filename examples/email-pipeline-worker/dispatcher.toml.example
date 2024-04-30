@@ -2,22 +2,22 @@
 url = "pulsar://<the service url from `minikube service`>"
 topics = [ "email-pipeline-start", "email-pipeline-fetch-users", "email-pipeline-generate-email", "email-pipeline-send-email", "email-pipeline-record-send-result" ]
 
-[[workers]]
+[[handlers]]
 task_selector = { type = "email-pipeline-start" }
 endpoint = "http://localhost:3000/start"
 
-[[workers]]
+[[handlers]]
 task_selector = { type = "email-pipeline-fetch-users" }
 endpoint = "http://localhost:3000/fetch-users"
 
-[[workers]]
+[[handlers]]
 task_selector = { type = "email-pipeline-generate-email" }
 endpoint = "http://localhost:3000/generate-email"
 
-[[workers]]
+[[handlers]]
 task_selector = { type = "email-pipeline-send-email" }
 endpoint = "http://localhost:3000/send-email"
 
-[[workers]]
+[[handlers]]
 task_selector = { type = "email-pipeline-record-send-result" }
 endpoint = "http://localhost:3000/record-send-result"

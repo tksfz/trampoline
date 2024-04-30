@@ -13,7 +13,7 @@ mod core;
 
 use data::DynamicTaskMessage;
 use core::WorkerMatcher;
-use core::{Forwarder, ForwardResult};
+use core::{Forwarder, HandleResult};
 
 #[derive(Serialize, Deserialize)]
 struct TestData {
@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
         .build_multi_topic();
 
     let client = Client::new();
-    let worker_matcher = WorkerMatcher::new(&config.workers)?;
+    let worker_matcher = WorkerMatcher::new(&config.handlers)?;
     let processor = Forwarder::new(client, worker_matcher);
 
     let mut counter = 0usize;
@@ -71,7 +71,7 @@ async fn main() -> Result<()> {
 
         let result = processor.process(&data).await?;
         match result {
-            Some(ForwardResult::Continue { status, response }) => {
+            Some(HandleResult::Continue { status, response }) => {
                 for response_task in &response.tasks {
                     let topic = &response_task.type_name;
                     producers.send(topic, response_task).await?;
@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
                 let plural = if response.tasks.len() == 1 { "task" } else { "tasks" };
                 log::info!("messageId:<{}> task:<{}> status:<{}> result:<Continue:{} new {}>", message_id, &data.type_name, status, response.tasks.len(), plural);
             },
-            Some(ForwardResult::ContinueUnparseable { status, text }) => {
+            Some(HandleResult::ContinueUnparseable { status, text }) => {
                 log::info!("got message {} {}, result: {} {}", &data.type_name, &data.task, status, text);
 
             },

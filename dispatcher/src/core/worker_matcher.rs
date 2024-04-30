@@ -3,14 +3,14 @@ use std::str::FromStr;
 use reqwest::Url;
 
 use crate::data::DynamicTaskMessage;
-use crate::config::TaskWorker;
+use crate::config::TaskHandler;
 
 pub struct WorkerMatcher {
     matchers: Vec<Box<dyn Fn(&DynamicTaskMessage) -> Option<Url>>>,
 }
 
 impl WorkerMatcher {
-    pub fn new(config: &[TaskWorker]) -> Result<WorkerMatcher, anyhow::Error> {
+    pub fn new(config: &[TaskHandler]) -> Result<WorkerMatcher, anyhow::Error> {
         // config.to_vec() is needed because Box<dyn Trait> is implicitly + 'static
         // and config.to_vec() does a deep clone that avoids requiring
         // &'static on config although that could also be fine
@@ -19,7 +19,7 @@ impl WorkerMatcher {
                 .map(|c| 
                     // Of course, we want to parse proper Url's here, early
                     // so that startup fails if any of them fail to parse
-                    Url::from_str(&c.endpoint).map(|u| (c, u))
+                    Url::from_str(&c.endpoint.clone().unwrap()).map(|u| (c, u))
                 )
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
