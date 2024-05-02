@@ -20,3 +20,5 @@ log = "0.4.6"
 futures = "0.3"
 
 reqwest = "0.12"
+
+async-trait = "0.1"

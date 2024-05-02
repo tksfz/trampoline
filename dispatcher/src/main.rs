@@ -12,8 +12,8 @@ mod data;
 mod core;
 
 use data::DynamicTaskMessage;
-use core::WorkerMatcher;
 use core::{Forwarder, HandleResult};
+use core::HandlerRepo;
 
 #[derive(Serialize, Deserialize)]
 struct TestData {
@@ -55,8 +55,8 @@ async fn main() -> Result<()> {
         .build_multi_topic();
 
     let client = Client::new();
-    let worker_matcher = WorkerMatcher::new(&config.handlers)?;
-    let processor = Forwarder::new(client, worker_matcher);
+    let handlers = HandlerRepo::new(&config.handlers)?;
+    let processor = Forwarder::new(client, handlers);
 
     let mut counter = 0usize;
     while let Some(msg) = consumer.try_next().await? {
