@@ -22,3 +22,6 @@ futures = "0.3"
 reqwest = "0.12"
 
 async-trait = "0.1"
+
+# Rune
+rune = "0.13"

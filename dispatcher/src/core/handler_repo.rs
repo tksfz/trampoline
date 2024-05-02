@@ -7,11 +7,13 @@ use crate::data::DynamicTaskMessage;
 use crate::config::TaskHandler;
 
 use super::handler::Handler;
+use super::rune::RuneScript;
 use super::worker::Worker;
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 enum HandlerDef {
     Endpoint(Url),
+    Pipeline(String),
 }
 
 pub struct HandlerRepo {
@@ -33,9 +35,9 @@ impl HandlerRepo {
                         let url = Url::from_str(&endpoint)?;
                         Ok((c, HandlerDef::Endpoint(url)))
                     },
-                    (_, Some(_pipeline)) => {
+                    (_, Some(pipeline)) => {
                         // TODO: this should actually load and validate the pipeline
-                        Err(anyhow::Error::msg("not implemented yet"))
+                        Ok((c.clone(), HandlerDef::Pipeline(pipeline.clone())))
                     }
                     (None, None) => {
                         Err(anyhow::Error::msg("no endpoint or pipeline specified"))
@@ -45,7 +47,11 @@ impl HandlerRepo {
             .collect::<Result<Vec<_>, _>>()?;
         let handlers = handler_defs.iter().map(|(_, def)| {
             match def {
-                HandlerDef::Endpoint(url) => (def.clone(), Box::new(Worker { endpoint: url.clone() }) as Box<dyn Handler>)
+                HandlerDef::Endpoint(url) =>
+                    (def.clone(), Box::new(Worker { endpoint: url.clone() }) as Box<dyn Handler>),
+                HandlerDef::Pipeline(pipeline) =>
+                    (def.clone(), Box::new(RuneScript { script: pipeline.clone() }) as Box<dyn Handler>)
+                
             }
         }).collect::<HashMap<HandlerDef, Box<dyn Handler>>>();
         let matchers = handler_defs
