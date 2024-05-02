@@ -1,31 +1,18 @@
 use anyhow::Result;
-use reqwest::{Client, StatusCode};
-use serde::Deserialize;
+use reqwest::Client;
 use crate::data::DynamicTaskMessage;
-use crate::core::worker_matcher::WorkerMatcher;
+use crate::core::handler_repo::HandlerRepo;
 
-pub enum HandleResult {
-    /// Successful processing that should continue with the tasks in the parsed WorkerResponse
-    Continue { status: StatusCode, response: WorkerResponse },
-
-    /// Successful processing with un unparseable response
-    ContinueUnparseable { status: StatusCode, text: String },
-}
+use super::handler::HandleResult;
 
 pub struct Forwarder {
     client: Client,
-    worker_matcher: WorkerMatcher,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct WorkerResponse {
-    /// responses can contain multiple tasks, of varying types
-    pub tasks: Vec<DynamicTaskMessage>,
+    handlers: HandlerRepo,
 }
 
 impl Forwarder {
-    pub fn new(client: Client, worker_matcher: WorkerMatcher) -> Forwarder {
-        Forwarder { client, worker_matcher }
+    pub fn new(client: Client, handlers: HandlerRepo) -> Forwarder {
+        Forwarder { client, handlers }
     }
 
     pub async fn process(&self, msg: &DynamicTaskMessage) -> Result<Option<HandleResult>> {
@@ -34,28 +21,12 @@ impl Forwarder {
         // validate the message against schema. this should maybe happen in the caller.
     
         // Map msg to the worker we should use
-        let endpoint = self.worker_matcher.match_worker(&msg);
+        let endpoint = self.handlers.match_handler(&msg);
 
         // Make the HTTP call    
         let result = match endpoint {
-            Some(url) => {
-                let body = serde_json::to_string(&msg.task)?;
-                let req = self.client
-                    .post(url.clone())
-                    .header("Content-Type", "application/json")
-                    .body(body);
-                let res = req.send().await?;
-                let status = res.status();
-                let text = res.text().await?;
-                let parsed_response: Result<WorkerResponse, serde_json::Error> = serde_json::from_str(&text);
-                let result = match parsed_response {
-                    Ok(worker_response) => HandleResult::Continue { status, response: worker_response },
-                    Err(_) =>
-                        // TODO: worker declaration should include a flag that indicates strict response handling, meaning an unparseable response should go to a DLQ
-                        HandleResult::ContinueUnparseable { status, text: text.clone() }
-                };
-                
-                log::info!("sent message {} {}, worker {}, received message {} {}", &msg.type_name, &msg.task, url, status, &text);
+            Some(handler) => {
+                let result = handler.handle(&self.client, &msg).await?;
                 Some(result)
             },
             None => {
