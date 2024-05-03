@@ -2,7 +2,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use reqwest::{Client, StatusCode};
 use rune::alloc::clone::TryClone;
-use rune::{Context, Diagnostics, Source, Sources, Vm};
+use rune::runtime::RuntimeContext;
+use rune::{Context, Diagnostics, Source, Sources, Unit, Vm};
 use rune::termcolor::{ColorChoice, StandardStream};
 use std::sync::Arc;
 
@@ -13,11 +14,12 @@ use super::{HandleResult, WorkerResponse};
 
 
 pub struct RuneScript {
-    pub script: Source,
+    runtime: Arc<RuntimeContext>,
+    unit: Arc<Unit>,
 }
 
 impl RuneScript {
-    async fn yeah(&self) -> Result<()> {
+    pub fn new(script: Source) -> Result<RuneScript> {
         // https://docs.rs/rune-modules/0.13.2/rune_modules/http/
         let mut context = Context::with_default_modules()?;
         context.install(rune_modules::http::module(true)?)?;
@@ -25,7 +27,7 @@ impl RuneScript {
         let runtime = Arc::new(context.runtime()?);
         
         let mut sources = Sources::new();
-        sources.insert(self.script.try_clone()?)?;
+        sources.insert(script.try_clone()?)?;
         
         let mut diagnostics = Diagnostics::new();
         
@@ -40,7 +42,11 @@ impl RuneScript {
         }
         
         let unit = result?;
-        let vm = Vm::new(runtime, Arc::new(unit));
+        Ok(RuneScript { runtime, unit: Arc::new(unit) })
+    }
+
+    async fn yeah(&self) -> Result<()> {
+        let vm = Vm::new(self.runtime.clone(), self.unit.clone());
         
         // https://rune-rs.github.io/book/multithreading.html
         let execution = vm.try_clone()?.send_execute(["main"], ())?;

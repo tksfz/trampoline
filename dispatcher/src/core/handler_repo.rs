@@ -52,7 +52,7 @@ impl HandlerRepo {
                 HandlerDef::Pipeline(pipeline) => {
                     // TODO: this should actually load and validate the pipeline
                     let source = Source::from_path(pipeline)?;
-                    Ok((def.clone(), Box::new(RuneScript { script: source }) as Box<dyn Handler>))
+                    Ok((def.clone(), Box::new(RuneScript::new(source)?) as Box<dyn Handler>))
                 }
             }
         }).collect::<Result<HashMap<HandlerDef, Box<dyn Handler>>, anyhow::Error>>()?;
