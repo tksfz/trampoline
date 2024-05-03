@@ -1,6 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use reqwest::{Client, StatusCode};
+use rune::alloc::clone::TryClone;
 use rune::{Context, Diagnostics, Source, Sources, Vm};
 use rune::termcolor::{ColorChoice, StandardStream};
 use std::sync::Arc;
@@ -12,7 +13,7 @@ use super::{HandleResult, WorkerResponse};
 
 
 pub struct RuneScript {
-    pub script: String,
+    pub script: Source,
 }
 
 impl RuneScript {
@@ -21,7 +22,7 @@ impl RuneScript {
         let runtime = Arc::new(context.runtime()?);
         
         let mut sources = Sources::new();
-        sources.insert(Source::memory(self.script.clone())?)?;
+        sources.insert(self.script.try_clone()?)?;
         
         let mut diagnostics = Diagnostics::new();
         
@@ -39,7 +40,7 @@ impl RuneScript {
         let mut vm = Vm::new(runtime, Arc::new(unit));
         
         let output = vm.call(["main"], ())?;
-        let output: () = rune::from_value(output)?;
+        let _output: () = rune::from_value(output)?;
         
         //println!("{}", output);
         Ok(())

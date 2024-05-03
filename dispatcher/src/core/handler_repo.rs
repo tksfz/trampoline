@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use reqwest::Url;
+use rune::Source;
 
 use crate::data::DynamicTaskMessage;
 use crate::config::TaskHandler;
@@ -36,7 +37,6 @@ impl HandlerRepo {
                         Ok((c, HandlerDef::Endpoint(url)))
                     },
                     (_, Some(pipeline)) => {
-                        // TODO: this should actually load and validate the pipeline
                         Ok((c.clone(), HandlerDef::Pipeline(pipeline.clone())))
                     }
                     (None, None) => {
@@ -47,13 +47,15 @@ impl HandlerRepo {
             .collect::<Result<Vec<_>, _>>()?;
         let handlers = handler_defs.iter().map(|(_, def)| {
             match def {
-                HandlerDef::Endpoint(url) =>
-                    (def.clone(), Box::new(Worker { endpoint: url.clone() }) as Box<dyn Handler>),
-                HandlerDef::Pipeline(pipeline) =>
-                    (def.clone(), Box::new(RuneScript { script: pipeline.clone() }) as Box<dyn Handler>)
-                
+                HandlerDef::Endpoint(url) => 
+                    Ok((def.clone(), Box::new(Worker { endpoint: url.clone() }) as Box<dyn Handler>)),
+                HandlerDef::Pipeline(pipeline) => {
+                    // TODO: this should actually load and validate the pipeline
+                    let source = Source::from_path(pipeline)?;
+                    Ok((def.clone(), Box::new(RuneScript { script: source }) as Box<dyn Handler>))
+                }
             }
-        }).collect::<HashMap<HandlerDef, Box<dyn Handler>>>();
+        }).collect::<Result<HashMap<HandlerDef, Box<dyn Handler>>, anyhow::Error>>()?;
         let matchers = handler_defs
             .into_iter()
             .map(|(c, handler_key)| { 
