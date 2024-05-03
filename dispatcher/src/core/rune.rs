@@ -17,8 +17,11 @@ pub struct RuneScript {
 }
 
 impl RuneScript {
-    fn yeah(&self) -> Result<()> {
-        let context = Context::with_default_modules()?;
+    async fn yeah(&self) -> Result<()> {
+        // https://docs.rs/rune-modules/0.13.2/rune_modules/http/
+        let mut context = Context::with_default_modules()?;
+        context.install(rune_modules::http::module(true)?)?;
+        context.install(rune_modules::json::module(true)?)?;
         let runtime = Arc::new(context.runtime()?);
         
         let mut sources = Sources::new();
@@ -37,11 +40,15 @@ impl RuneScript {
         }
         
         let unit = result?;
-        let mut vm = Vm::new(runtime, Arc::new(unit));
+        let vm = Vm::new(runtime, Arc::new(unit));
         
-        let output = vm.call(["main"], ())?;
-        let _output: () = rune::from_value(output)?;
-        
+        // https://rune-rs.github.io/book/multithreading.html
+        let execution = vm.try_clone()?.send_execute(["main"], ())?;
+        let _t1 = tokio::spawn(async move {
+            execution.async_complete().await.unwrap();
+            println!("timer ticked");
+        });
+
         //println!("{}", output);
         Ok(())
     }
@@ -50,7 +57,7 @@ impl RuneScript {
 #[async_trait]
 impl Handler for RuneScript {
     async fn handle(&self, _client: &Client, _task: &DynamicTaskMessage) -> Result<HandleResult> {
-        self.yeah()?;
+        self.yeah().await?;
         Ok(HandleResult::Continue {
             status: StatusCode::OK,
             response: WorkerResponse {
