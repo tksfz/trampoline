@@ -3,11 +3,24 @@ struct Task {
   task
 }
 
-async fn handle(client, type, task) {
+pub async fn handle(type, task_str) {
+  let client = http::Client::new();
+  let json = json::from_string(task_str)?;
+  dbg(`type: ${type}`);
+  dbg(`json: ${task_str}`);
+  let r = handle_internal(client, type, json).await?;
+  match r {
+    task if r is TrampolineTask => Ok([ task ]),
+    vec if r is Vec => Ok(vec),
+    x => Err(x),
+  }
+}
+
+async fn handle_internal(client, type, task) {
   match type {
     "email-pipeline-start" => {
-      Ok(Task {
-        type: "email-pipeline-fetch-users",
+      Ok(TrampolineTask {
+        type_name: "email-pipeline-fetch-users",
         task: #{
           "email_subject": task.get("email_subject"),
         }
@@ -73,7 +86,7 @@ pub async fn main() {
     match task {
       Some(task) => {
         dbg(task);
-        let result = handle(client, task.type, task.task).await;
+        let result = handle_internal(client, task.type, task.task).await;
         match result {
           // This seems necessary to propagate the error out of the loop
           Err(x) => panic!("{}", x)
