@@ -80,8 +80,8 @@ impl RuneScript {
             // (e.g. in lieu of a try block)
             let r = Self::exfiltrate_script_result(tx, execution.async_complete().await);
             match r {
-                Ok(x) => println!("script value exfiltration result: {:?}", x),
-                Err(y) => println!("script value exfiltration error: {}", y)
+                Ok(_) => {}, //println!("script value exfiltration result: {:?}", x),
+                Err(y) => println!("script value exfiltration error: {:?}", y)
             }
         });
         //rx.await?;
@@ -89,6 +89,7 @@ impl RuneScript {
     }
 
     fn exfiltrate_script_result(tx: Sender<Vec<DynamicTaskMessage>>, r: VmResult<Value>) -> Result<()> {
+        // If the script returns Result::Err maybe that should be handled differently
         let r = rune::from_value::<Result<Vec<TrampolineTask>>>(r.into_result()?)
             .context("error unmarshalling script Result")?
             .context("script returned Result::Err")?;
@@ -113,11 +114,10 @@ impl Handler for RuneScript {
         let (tx, rx) = tokio::sync::oneshot::channel::<Vec<DynamicTaskMessage>>();
         self.execute(tx, client, task).await?;
         let result = rx.await?;
-        println!("result: {:?}", result);
         Ok(HandleResult::Continue {
             status: StatusCode::OK,
             response: WorkerResponse {
-                tasks: vec![]
+                tasks: result
             }
         })
     }

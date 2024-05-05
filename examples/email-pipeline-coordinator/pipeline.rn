@@ -6,8 +6,8 @@ struct Task {
 pub async fn handle(type, task_str) {
   let client = http::Client::new();
   let json = json::from_string(task_str)?;
-  dbg(`type: ${type}`);
-  dbg(`json: ${task_str}`);
+  //dbg(`type: ${type}`);
+  //dbg(`json: ${task_str}`);
   let r = handle_internal(client, type, json).await?;
   match r {
     task if r is TrampolineTask => Ok([ task ]),
@@ -28,8 +28,8 @@ async fn handle_internal(client, type, task) {
     },
     "email-pipeline-fetch-users" => {
       let res = json::from_string(http::get("http://localhost:3000/users").await?.text().await?)?;
-      Ok(res.iter().map(|u| Task {
-        type: "email-pipeline-generate-email",
+      Ok(res.iter().map(|u| TrampolineTask {
+        type_name: "email-pipeline-generate-email",
         task: #{
           "email_address": u,
           "email_subject": task.get("email_subject"),
@@ -40,8 +40,8 @@ async fn handle_internal(client, type, task) {
       let res = http::get(`http://localhost:3000/generate-email?email_address=${task["email_address"]}`)
         .await?.text().await?;
       let email_data = json::from_string(res)?;
-      Ok(Task {
-        type: "email-pipeline-send-email",
+      Ok(TrampolineTask {
+        type_name: "email-pipeline-send-email",
         task: #{
           "email_address": email_data["email_address"],
           "email_subject": email_data["email_subject"],
@@ -61,8 +61,8 @@ async fn handle_internal(client, type, task) {
         .send().await?
         .text().await?;
       let success = json::from_string(res)?;
-      Ok(Task {
-        type: "email-pipeline-record-send-result",
+      Ok(TrampolineTask {
+        type_name: "email-pipeline-record-send-result",
         task: #{
           "email_address": task.email_address,
           "successful": success,
