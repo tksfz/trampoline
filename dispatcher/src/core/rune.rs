@@ -1,10 +1,11 @@
-use anyhow::Result;
+use anyhow::{anyhow, Context as AnyhowContext, Result};
 use async_trait::async_trait;
 use reqwest::{Client, StatusCode};
 use rune::alloc::clone::TryClone;
 use rune::runtime::{RuntimeContext, VmResult};
 use rune::{Any, Context, ContextError, Diagnostics, Module, Source, Sources, Unit, Value, Vm};
 use rune::termcolor::{ColorChoice, StandardStream};
+use tokio::sync::oneshot::Sender;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -65,7 +66,7 @@ impl RuneScript {
         Ok(RuneScript { runtime, unit: Arc::new(unit) })
     }
 
-    async fn execute(&self, _client: &Client, task: &DynamicTaskMessage) -> Result<HandleResult> {
+    async fn execute(&self, tx: Sender<Vec<DynamicTaskMessage>>, _client: &Client, task: &DynamicTaskMessage) -> Result<HandleResult> {
         let vm = Vm::new(self.runtime.clone(), self.unit.clone());
         
         // TODO: figure out how to pass Rune json value directly
@@ -77,17 +78,31 @@ impl RuneScript {
         let _t1 = tokio::spawn(async move {
             // get_script_result is syntactically necessary here to deal with the intermediate Result
             // (e.g. in lieu of a try block)
-            let r = Self::get_script_result(execution.async_complete().await);
+            let r = Self::exfiltrate_script_result(tx, execution.async_complete().await);
             match r {
-                Ok(x) => println!("script returned value {:?}", x),
-                Err(y) => println!("script got error {}", y)
+                Ok(x) => println!("script value exfiltration result: {:?}", x),
+                Err(y) => println!("script value exfiltration error: {}", y)
             }
         });
+        //rx.await?;
         Ok(HandleResult::Continue { status: StatusCode::OK, response: WorkerResponse { tasks: vec![] } })
     }
 
-    fn get_script_result(r: VmResult<Value>) -> Result<Vec<TrampolineTask>> {
-        rune::from_value::<Result<Vec<TrampolineTask>>>(r.into_result()?)?
+    fn exfiltrate_script_result(tx: Sender<Vec<DynamicTaskMessage>>, r: VmResult<Value>) -> Result<()> {
+        let r = rune::from_value::<Result<Vec<TrampolineTask>>>(r.into_result()?)
+            .context("error unmarshalling script Result")?
+            .context("script returned Result::Err")?;
+        let r2 = r.into_iter().map(|t| Self::to_message(t)).collect::<Result<Vec<_>>>()?;
+        tx.send(r2).map_err(|e| anyhow!("failed to send script result, maybe receiver is dropped? {:?}", e))?;
+        Ok(())
+    }
+
+    fn to_message(t: TrampolineTask) -> Result<DynamicTaskMessage> {
+        let json = serde_json::to_value(t.task)?;
+        Ok(DynamicTaskMessage {
+            type_name: t.type_name,
+            task: json
+        })
     }
 
 }
@@ -95,7 +110,10 @@ impl RuneScript {
 #[async_trait]
 impl Handler for RuneScript {
     async fn handle(&self, client: &Client, task: &DynamicTaskMessage) -> Result<HandleResult> {
-        self.execute(client, task).await?;
+        let (tx, rx) = tokio::sync::oneshot::channel::<Vec<DynamicTaskMessage>>();
+        self.execute(tx, client, task).await?;
+        let result = rx.await?;
+        println!("result: {:?}", result);
         Ok(HandleResult::Continue {
             status: StatusCode::OK,
             response: WorkerResponse {
