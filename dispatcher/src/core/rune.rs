@@ -14,7 +14,6 @@ use crate::data::DynamicTaskMessage;
 use super::handler::Handler;
 use super::{HandleResult, WorkerResponse};
 
-
 #[derive(Debug, Any)]
 #[rune(constructor)]
 struct TrampolineTask {
@@ -30,6 +29,7 @@ pub struct RuneScript {
 }
 
 impl RuneScript {
+    // Adds external type TrampolineTask
     pub fn trampoline_module() -> Result<Module, ContextError> {
         let mut module = Module::default();
         module.ty::<TrampolineTask>()?;
@@ -42,13 +42,28 @@ impl RuneScript {
         context.install(rune_modules::http::module(true)?)?;
         context.install(rune_modules::json::module(true)?)?;
 
-
         context.install(Self::trampoline_module()?)?;
 
         let runtime = Arc::new(context.runtime()?);
         
         let mut sources = Sources::new();
         sources.insert(script.try_clone()?)?;
+        
+        // Rune script that invokes the user-supplied script, with
+        // some marshalling/unmarshalling helpers
+        let wrapper_script = "pub async fn handler_wrapper(type, task_str) {
+            let client = http::Client::new();
+            let json = json::from_string(task_str)?;
+            //dbg(`type: ${type}`);
+            //dbg(`json: ${task_str}`);
+            let r = handle_task(client, type, json).await?;
+            match r {
+              task if r is TrampolineTask => Ok([ task ]),
+              vec if r is Vec => Ok(vec),
+              x => Err(x),
+            }
+          }";          
+        sources.insert(Source::memory(wrapper_script)?)?;
         
         let mut diagnostics = Diagnostics::new();
         
@@ -66,17 +81,17 @@ impl RuneScript {
         Ok(RuneScript { runtime, unit: Arc::new(unit) })
     }
 
-    async fn execute(&self, tx: Sender<Vec<DynamicTaskMessage>>, _client: &Client, task: &DynamicTaskMessage) -> Result<HandleResult> {
+    async fn execute(&self, tx: Sender<Vec<DynamicTaskMessage>>, _client: &Client, task: &DynamicTaskMessage) -> Result<()> {
         let vm = Vm::new(self.runtime.clone(), self.unit.clone());
         
         // TODO: figure out how to pass Rune json value directly
         let json = serde_json::to_string(&task.task)?;
 
         // https://rune-rs.github.io/book/multithreading.html
-        let execution = vm.try_clone()?.send_execute(["handle"], (task.type_name.clone(), json))?;
+        let execution = vm.try_clone()?.send_execute(["handler_wrapper"], (task.type_name.clone(), json))?;
         // https://rust-lang.github.io/async-book/07_workarounds/02_err_in_async_blocks.html
         let _t1 = tokio::spawn(async move {
-            // get_script_result is syntactically necessary here to deal with the intermediate Result
+            // exfiltrate_script_result is syntactically necessary here to deal with the intermediate Result
             // (e.g. in lieu of a try block)
             let r = Self::exfiltrate_script_result(tx, execution.async_complete().await);
             match r {
@@ -84,8 +99,7 @@ impl RuneScript {
                 Err(y) => println!("script value exfiltration error: {:?}", y)
             }
         });
-        //rx.await?;
-        Ok(HandleResult::Continue { status: StatusCode::OK, response: WorkerResponse { tasks: vec![] } })
+        Ok(())
     }
 
     fn exfiltrate_script_result(tx: Sender<Vec<DynamicTaskMessage>>, r: VmResult<Value>) -> Result<()> {
