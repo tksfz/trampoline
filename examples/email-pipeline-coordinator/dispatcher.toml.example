@@ -1,0 +1,23 @@
+[mq]
+url = "pulsar://<the service url from `minikube service`>"
+topics = [ "email-pipeline-start", "email-pipeline-fetch-users", "email-pipeline-generate-email", "email-pipeline-send-email", "email-pipeline-record-send-result" ]
+
+[[handlers]]
+task_selector = { type = "email-pipeline-start" }
+pipeline = "../examples/email-pipeline-coordinator/pipeline.rn"
+
+[[handlers]]
+task_selector = { type = "email-pipeline-fetch-users" }
+pipeline = "../examples/email-pipeline-coordinator/pipeline.rn"
+
+[[handlers]]
+task_selector = { type = "email-pipeline-generate-email" }
+pipeline = "../examples/email-pipeline-coordinator/pipeline.rn"
+
+[[handlers]]
+task_selector = { type = "email-pipeline-send-email" }
+pipeline = "../examples/email-pipeline-coordinator/pipeline.rn"
+
+[[handlers]]
+task_selector = { type = "email-pipeline-record-send-result" }
+pipeline = "../examples/email-pipeline-coordinator/pipeline.rn"

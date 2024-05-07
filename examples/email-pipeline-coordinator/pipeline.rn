@@ -1,13 +1,8 @@
-struct Task {
-  type,
-  task
-}
-
-async fn handle(client, type, task) {
+async fn handle_task(client, type, task) {
   match type {
     "email-pipeline-start" => {
-      Ok(Task {
-        type: "email-pipeline-fetch-users",
+      Ok(TrampolineTask {
+        type_name: "email-pipeline-fetch-users",
         task: #{
           "email_subject": task.get("email_subject"),
         }
@@ -15,8 +10,8 @@ async fn handle(client, type, task) {
     },
     "email-pipeline-fetch-users" => {
       let res = json::from_string(http::get("http://localhost:3000/users").await?.text().await?)?;
-      Ok(res.iter().map(|u| Task {
-        type: "email-pipeline-generate-email",
+      Ok(res.iter().map(|u| TrampolineTask {
+        type_name: "email-pipeline-generate-email",
         task: #{
           "email_address": u,
           "email_subject": task.get("email_subject"),
@@ -27,8 +22,8 @@ async fn handle(client, type, task) {
       let res = http::get(`http://localhost:3000/generate-email?email_address=${task["email_address"]}`)
         .await?.text().await?;
       let email_data = json::from_string(res)?;
-      Ok(Task {
-        type: "email-pipeline-send-email",
+      Ok(TrampolineTask {
+        type_name: "email-pipeline-send-email",
         task: #{
           "email_address": email_data["email_address"],
           "email_subject": email_data["email_subject"],
@@ -48,8 +43,8 @@ async fn handle(client, type, task) {
         .send().await?
         .text().await?;
       let success = json::from_string(res)?;
-      Ok(Task {
-        type: "email-pipeline-record-send-result",
+      Ok(TrampolineTask {
+        type_name: "email-pipeline-record-send-result",
         task: #{
           "email_address": task.email_address,
           "successful": success,
@@ -67,13 +62,13 @@ async fn handle(client, type, task) {
 pub async fn main() {
   let client = http::Client::new();
   let tasks = Vec::new();
-  tasks.push(Task { type: "email-pipeline-fetch-users", task: #{} });
+  tasks.push(TrampolineTask { type_name: "email-pipeline-fetch-users", task: #{} });
   loop {
     let task = tasks.pop();
     match task {
       Some(task) => {
         dbg(task);
-        let result = handle(client, task.type, task.task).await;
+        let result = handle_task(client, task.type, task.task).await;
         match result {
           // This seems necessary to propagate the error out of the loop
           Err(x) => panic!("{}", x)
@@ -81,7 +76,7 @@ pub async fn main() {
         let result = result?;
         dbg(result);
         let result_tasks = match result {
-          task if result is Task => [ task ],
+          task if result is TrampolineTask => [ task ],
           vec if result is Vec => vec,
         };
         for result_task in result_tasks {
