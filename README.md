@@ -72,7 +72,7 @@ For `mq.url` use the Pulsar service URL printed from the `minikube service` comm
 
 ## Build and Run the Dispatcher
 
-```
+```bash
 trampoline/dispatcher$ RUST_LOG=info cargo run
 ```
 
