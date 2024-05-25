@@ -1,10 +1,9 @@
 use futures::TryStreamExt;
 use pulsar::{
-    message::{proto::command_subscribe::SubType, Payload},
-    Consumer, DeserializeMessage, Pulsar, TokioExecutor,
+    message::proto::command_subscribe::SubType,
+    Consumer, Pulsar, TokioExecutor,
 };
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use anyhow::{bail, Result};
 
 mod config;
@@ -14,19 +13,6 @@ mod core;
 use data::DynamicTaskMessage;
 use core::{Forwarder, HandleResult};
 use core::HandlerRepo;
-
-#[derive(Serialize, Deserialize)]
-struct TestData {
-    data: String,
-}
-
-impl DeserializeMessage for TestData {
-    type Output = Result<TestData, serde_json::Error>;
-
-    fn deserialize_message(payload: &Payload) -> Self::Output {
-        serde_json::from_slice(&payload.data)
-    }
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
