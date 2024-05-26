@@ -72,17 +72,17 @@ For `mq.url` use the Pulsar service URL printed from the `minikube service` comm
 
 ## Build and Run the Dispatcher
 
-```
+```bash
 trampoline/dispatcher$ RUST_LOG=info cargo run
 ```
 
 ## Send Task Messages to the Queue
 
-The Pulsar deployment includes a toolkit pod that contains the basic Pulsar tools:
+The Dispatcher has an HTTP endpoint for publishing tasks to the appropriate topics:
 
-```
-$ kubectl exec -it -n pulsar pulsar-mini-toolset-0 -- /bin/bash
-pulsar@pulsar-mini-toolset-0:/pulsar$ bin/pulsar-client produce email-pipeline-start -m '{"type": "email-pipeline-start", "task": {}}' -s '\n'
+```bash
+$ curl 'localhost:2000/tasks/email-pipeline-start/submit' -d '{}' -H 'Content-Type: application/json'
+{"successful":true}
 ```
 
 This triggers a run of the dummy batch email pipeline. You can observe the run by

@@ -1,7 +1,6 @@
 use futures::TryStreamExt;
 use pulsar::{
-    message::proto::command_subscribe::SubType,
-    Consumer, Pulsar, TokioExecutor,
+    message::proto::command_subscribe::SubType, Consumer, Pulsar, TokioExecutor
 };
 use reqwest::Client;
 use anyhow::{bail, Result};
@@ -9,10 +8,15 @@ use anyhow::{bail, Result};
 mod config;
 mod data;
 mod core;
+mod producer;
+mod serve;
 
 use data::DynamicTaskMessage;
 use core::{Forwarder, HandleResult};
 use core::HandlerRepo;
+
+use producer::Producer;
+use serve::Serve;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -26,6 +30,11 @@ async fn main() -> Result<()> {
 
     let pulsar: Pulsar<_> = Pulsar::builder(config.mq.url, TokioExecutor).build().await?;
 
+    let submit_producer = Producer::<TokioExecutor>::new(&pulsar, "trampoline-dispatcher-submitter");
+
+    let serve = Serve::new(submit_producer);
+    serve.spawn_start().await;
+
     let mut consumer: Consumer<DynamicTaskMessage, _> = pulsar
         .consumer()
         .with_topics(config.mq.topics)
@@ -35,10 +44,7 @@ async fn main() -> Result<()> {
         .build()
         .await?;
 
-    let mut producers = pulsar
-        .producer()
-        .with_name("trampoline-dispatcher-republish")
-        .build_multi_topic();
+    let mut producer = Producer::<TokioExecutor>::new(&pulsar, "trampoline-disapatcher-republish");
 
     let client = Client::new();
     let handlers = HandlerRepo::new(&config.handlers)?;
@@ -59,8 +65,7 @@ async fn main() -> Result<()> {
         match result {
             Some(HandleResult::Continue { status, response }) => {
                 for response_task in &response.tasks {
-                    let topic = &response_task.type_name;
-                    producers.send(topic, response_task).await?;
+                    producer.send(response_task).await?;
                 }
                 let message_id = format!("{}:{}:{}:{}", &msg.topic, msg.message_id.id.ledger_id, msg.message_id.id.entry_id, msg.message_id.id.partition.unwrap_or(-1));
                 let plural = if response.tasks.len() == 1 { "task" } else { "tasks" };

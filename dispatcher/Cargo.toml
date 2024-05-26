@@ -26,3 +26,6 @@ async-trait = "0.1"
 # Rune
 rune = "0.13.2"
 rune-modules = { version = "0.13.2", features = ["http", "json"] }
+
+# Axum -- make this optional?
+axum = "0.7"
