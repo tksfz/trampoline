@@ -4,7 +4,7 @@ use axum::{extract::{Path, State}, routing::{get, post}, Json, Router};
 use pulsar::TokioExecutor;
 use reqwest::StatusCode;
 use serde_json::{json, Value};
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, task::JoinHandle};
 
 use crate::{data::DynamicTaskMessage, producer::Producer};
 
@@ -23,6 +23,10 @@ impl Serve {
     pub fn new(submit_producer: Producer<TokioExecutor>) -> Serve {
         let submit_producer = Arc::new(Mutex::new(submit_producer));
         Serve { submit_producer }
+    }
+
+    pub async fn spawn_start(self) -> JoinHandle<()> {
+        tokio::spawn(async move { self.start().await })
     }
 
     pub async fn start(&self) {

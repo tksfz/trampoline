@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
     let submit_producer = Producer::<TokioExecutor>::new(&pulsar, "trampoline-dispatcher-submitter");
 
     let serve = Serve::new(submit_producer);
-    serve.start().await;
+    serve.spawn_start().await;
 
     let mut consumer: Consumer<DynamicTaskMessage, _> = pulsar
         .consumer()
