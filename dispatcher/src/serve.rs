@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{extract::State, routing::get, routing::post, Json, Router};
+use axum::{extract::{Path, State}, routing::{get, post}, Json, Router};
 use pulsar::TokioExecutor;
 use reqwest::StatusCode;
 use serde_json::{json, Value};
@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 
 use crate::{data::DynamicTaskMessage, producer::Producer};
 
-/// Optional HTTP endpoints served directly from the Dispatcher
+/// If enabled, HTTP endpoints served directly from the Dispatcher
 
 #[derive(Clone)]
 struct AppState {
@@ -30,15 +30,16 @@ impl Serve {
         // build our application with a single route
         let app = Router::new()
             .route("/", get(|| async { "Hello, World!" }))
-            .route("/tasks/submit", post(Self::submit_task))
+            .route("/tasks/submit_raw", post(Self::submit_dynamic_task))
+            .route("/tasks/:type/submit", post(Self::submit_task))
             .with_state(state);
 
-        // run our app with hyper, listening globally on port 3000
-        let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+        // run our app with hyper, listening globally on port 2000
+        let listener = tokio::net::TcpListener::bind("0.0.0.0:2000").await.unwrap();
         axum::serve(listener, app).await.unwrap();
     }
 
-    async fn submit_task(State(app_state): State<AppState>, Json(msg): Json<DynamicTaskMessage>) -> std::result::Result<Json<Value>, StatusCode> {
+    async fn submit_dynamic_task(State(app_state): State<AppState>, Json(msg): Json<DynamicTaskMessage>) -> std::result::Result<Json<Value>, StatusCode> {
         let mut producer = app_state.producer.lock().await;
         producer.send(&msg).await.map_err(|_| { StatusCode::INTERNAL_SERVER_ERROR })?;
         let result = json![
@@ -48,5 +49,16 @@ impl Serve {
         ];
         Ok(Json::from(result))
     }
-    
+
+    async fn submit_task(State(app_state): State<AppState>, Path(type_name): Path<String>, Json(task): Json<Value>) -> std::result::Result<Json<Value>, StatusCode> {
+        let msg = DynamicTaskMessage { type_name, task };
+        let mut producer = app_state.producer.lock().await;
+        producer.send(&msg).await.map_err(|_| { StatusCode::INTERNAL_SERVER_ERROR })?;
+        let result = json![
+            {
+                "successful": true
+            }
+        ];
+        Ok(Json::from(result))
+    }
 }
