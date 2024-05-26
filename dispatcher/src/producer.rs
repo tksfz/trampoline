@@ -3,6 +3,7 @@ use pulsar::{producer::SendFuture, Executor, MultiTopicProducer, Pulsar};
 
 use crate::data::DynamicTaskMessage;
 
+/// Producer for task messages that routes tasks based on their content
 pub struct Producer<Exe: Executor> {
     producer: MultiTopicProducer<Exe>
 }
